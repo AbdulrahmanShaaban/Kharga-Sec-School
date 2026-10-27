@@ -1,0 +1,226 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Better Auth core models
+model User {
+  id            String           @id @default(cuid())
+  name          String?
+  email         String           @unique
+  emailVerified Boolean          @default(false)
+  image         String?
+  role          Role             @default(STUDENT)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  PARENT
+  STUDENT
+}
+
+// Site configuration
+model SiteSettings {
+  id           String   @id @default(cuid())
+  schoolName   String?
+  tagline      String?   @db.Text
+  logoUrl      String?
+  heroImageUrl String?
+  address      String?
+  phone        String?
+  email        String?
+  hours        String?   @db.Text
+  mapUrl       String?
+  facebookUrl  String?
+  twitterUrl   String?
+  instagramUrl String?
+  footerText   String?   @db.Text
+  seoTitle     String?
+  seoDesc      String?   @db.Text
+  updatedAt    DateTime  @updatedAt
+  updatedBy    String?
+}
+
+// Content items: news, activities, competitions
+model ContentItem {
+  id             String          @id @default(cuid())
+  type           ContentType
+  title          String
+  slug           String          @unique
+  excerpt        String?         @db.Text
+  body           String          @db.Text
+  status         ContentStatus  @default(DRAFT)
+  publishedAt    DateTime?
+  eventStartAt   DateTime?
+  eventEndAt     DateTime?
+  location       String?
+  conditions     String?         @db.Text
+  results        String?         @db.Text
+  pinned         Boolean         @default(false)
+  sortOrder      Int             @default(0)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  createdBy      String?
+  updatedBy      String?
+  media          ContentMedia[]
+}
+
+enum ContentType {
+  NEWS
+  ACTIVITY
+  COMPETITION
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+  SCHEDULED
+}
+
+model ContentMedia {
+  id            String       @id @default(cuid())
+  contentItemId String
+  publicId      String
+  secureUrl     String
+  altText       String?
+  width         Int?
+  height        Int?
+  mediaType     MediaType
+  isCover       Boolean       @default(false)
+  sortOrder     Int           @default(0)
+  createdAt     DateTime      @default(now())
+  contentItem   ContentItem   @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+// Complaints - fully private
+model Complaint {
+  id             String          @id @default(cuid())
+  referenceCode  String          @unique
+  subject        String
+  category       String
+  message        String          @db.Text
+  submitterName  String?
+  contactEmail   String?
+  contactPhone   String?
+  gradeClass     String?
+  status         ComplaintStatus @default(NEW)
+  internalNotes  String?         @db.Text
+  submittedAt    DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  reviewedAt     DateTime?
+  reviewedBy     String?
+  resolvedAt     DateTime?
+}
+
+enum ComplaintStatus {
+  NEW
+  UNDER_REVIEW
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+// Suggestions - private storage, separate published table
+model SuggestionPrivate {
+  id               String            @id @default(cuid())
+  suggestionText   String            @db.Text
+  submitterName    String?
+  contactEmail     String?
+  contactPhone     String?
+  status           SuggestionStatus  @default(PENDING)
+  reviewNote       String?           @db.Text
+  submittedAt      DateTime          @default(now())
+  reviewedAt       DateTime?
+  reviewedBy       String?
+  published        PublishedSuggestion?
+}
+
+enum SuggestionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  HIDDEN
+}
+
+model PublishedSuggestion {
+  id                 String            @id @default(cuid())
+  suggestionText     String            @db.Text
+  publishedAt        DateTime          @default(now())
+  suggestionPrivate  SuggestionPrivate  @relation(fields: [suggestionPrivateId], references: [id], onDelete: Cascade)
+  suggestionPrivateId String            @unique
+}
+
+// Admin audit trail
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  action     String
+  entityType String
+  entityId   String
+  metadata   String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId])
+}
+
+// Rate limiting
+model RateLimitEntry {
+  id        String   @id @default(cuid())
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+}
