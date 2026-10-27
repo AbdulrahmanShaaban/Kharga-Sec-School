@@ -16,7 +16,7 @@ function createPrismaStub(): PrismaClient {
       const name = String(prop);
 
       // PrismaClient methods
-      if (name === "$connect" || name === "$disconnect") return noop;
+      if (name === "$connect" || name === "$disconnect") return () => Promise.resolve();
       if (name === "$transaction") return noop;
       if (name === "$queryRaw" || name === "$executeRaw") return noop;
       if (name === "then" || name === "catch" || name === "toString" || name === "valueOf") return undefined;
@@ -46,7 +46,8 @@ function createPrismaStub(): PrismaClient {
     },
   };
 
-  return new Proxy(new PrismaClient(), handler);
+  // Create a bare object cast as PrismaClient — never call the real constructor
+  return new Proxy({} as PrismaClient, handler);
 }
 
 function createClient(): PrismaClient {
