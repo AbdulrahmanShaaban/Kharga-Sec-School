@@ -3,9 +3,12 @@ import { prisma } from "@/lib/db";
 import Link from "next/link";
 import Image from "next/image";
 import { format } from "date-fns";
+import { Prisma } from "@prisma/client";
+
+type ContentItemWithMedia = Prisma.ContentItemGetPayload<{ include: { media: true } }>;
 
 export default async function ActivitiesPage() {
-  let items: any[] = [];
+  let items: ContentItemWithMedia[] = [];
   try {
     items = await prisma.contentItem.findMany({
       where: { type: "ACTIVITY", status: "PUBLISHED" },
@@ -25,8 +28,8 @@ export default async function ActivitiesPage() {
           <p className="text-muted-foreground">لا توجد أنشطة منشورة حتى الآن</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {items.map((item: any) => {
-              const cover = item.media.find((m: any) => m.isCover);
+            {items.map((item: ContentItemWithMedia) => {
+              const cover = item.media.find((m: ContentItemWithMedia["media"][number]) => m.isCover);
               return (
                 <Link key={item.id} href={`/activities/${item.slug}`} className="block">
                   <article className="rounded-lg border bg-card overflow-hidden hover:shadow-lg transition">

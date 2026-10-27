@@ -3,8 +3,15 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
+interface MediaAsset {
+  id?: string;
+  publicId?: string;
+  url?: string;
+  [key: string]: unknown;
+}
+
 export default function MediaPage() {
-  const [assets, setAssets] = useState<any[]>([]);
+  const [assets, setAssets] = useState<MediaAsset[]>([]);
 
   useEffect(() => {
     fetch("/api/admin/media").then((r) => r.json()).then((d) => setAssets(d.assets || d || []));
@@ -32,7 +39,7 @@ export default function MediaPage() {
         <Button onClick={handleUpload}>رفع ملف</Button>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {assets.map((a: any) => (
+        {assets.map((a: MediaAsset) => (
           <div key={a.id ?? a.publicId} className="border p-2 rounded">
             <p className="text-xs truncate">{a.publicId ?? a.url}</p>
           </div>

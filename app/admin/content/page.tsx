@@ -4,14 +4,15 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Prisma, ContentType, ContentStatus } from "@prisma/client";
 
 export default async function AdminContentPage({ searchParams }: { searchParams: Promise<{ type?: string; status?: string }> }) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session || session.user.role !== "ADMIN") redirect("/admin/login");
   const sp = await searchParams;
-  const where: any = {};
-  if (sp.type) where.type = sp.type;
-  if (sp.status) where.status = sp.status;
+  const where: Prisma.ContentItemWhereInput = {};
+  if (sp.type) where.type = sp.type as ContentType;
+  if (sp.status) where.status = sp.status as ContentStatus;
   const items = await prisma.contentItem.findMany({ where, orderBy: { createdAt: "desc" } });
 
   return (
@@ -31,7 +32,7 @@ export default async function AdminContentPage({ searchParams }: { searchParams:
           </tr>
         </thead>
         <tbody>
-          {items.map((item: any) => (
+          {items.map((item: Prisma.ContentItemGetPayload<{}>) => (
             <tr key={item.id} className="border-t">
               <td className="p-2">{item.title}</td>
               <td className="p-2">{item.type}</td>

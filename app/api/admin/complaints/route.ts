@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 
 async function checkAdmin() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -21,8 +22,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
 
-    const where: any = {};
-    if (status) where.status = status.toUpperCase();
+    const where: Prisma.ComplaintWhereInput = {};
+    if (status) where.status = status.toUpperCase() as never;
 
     const complaints = await prisma.complaint.findMany({
       where,
@@ -42,19 +43,19 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
-    const { id, status, internalNotes } = body;
+const body = await request.json() as Record<string, unknown>;
+const { id, status, internalNotes } = body as { id?: string; status?: string; internalNotes?: string };
 
     if (!id) {
       return NextResponse.json({ error: "المعرف مطلوب" }, { status: 400 });
     }
 
-    const updateData: any = {
+    const updateData: Prisma.ComplaintUpdateManyMutationInput = {
       updatedAt: new Date(),
     };
 
     if (status) {
-      updateData.status = status.toUpperCase();
+      updateData.status = status.toUpperCase() as never;
       if (status.toUpperCase() === "RESOLVED" || status.toUpperCase() === "CLOSED") {
         updateData.resolvedAt = new Date();
       }

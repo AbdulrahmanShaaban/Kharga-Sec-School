@@ -5,19 +5,20 @@ import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Prisma } from "@prisma/client";
 
 export default function SuggestionDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const router = useRouter();
-  const [s, setS] = useState<any>(null);
+  const [s, setS] = useState<Prisma.SuggestionPrivateGetPayload<{}> | null>(null);
   const [reviewNote, setReviewNote] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch("/api/admin/suggestions")
       .then((r) => r.json())
-      .then((list: any[]) => {
+      .then((list: Prisma.SuggestionPrivateGetPayload<{}>[]) => {
         const found = list.find((x) => x.id === id);
         if (found) {
           setS(found);

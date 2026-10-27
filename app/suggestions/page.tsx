@@ -41,8 +41,12 @@ export default function SuggestionsPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error ?? "حدث خطأ");
       setSuccess(true);
-    } catch (e: any) {
-      setError(e?.message ?? "حدث خطأ");
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+        setError(e.message);
+      } else {
+        setError("حدث خطأ");
+      }
     } finally {
       setSubmitting(false);
     }

@@ -3,13 +3,14 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
+import { Prisma, ComplaintStatus } from "@prisma/client";
 
 export default async function AdminComplaintsPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session || session.user.role !== "ADMIN") redirect("/admin/login");
   const sp = await searchParams;
-  const where: any = {};
-  if (sp.status) where.status = sp.status;
+  const where: Prisma.ComplaintWhereInput = {};
+  if (sp.status) where.status = sp.status as ComplaintStatus;
   const items = await prisma.complaint.findMany({ where, orderBy: { submittedAt: "desc" } });
   return (
     <div className="space-y-4">
@@ -21,7 +22,7 @@ export default async function AdminComplaintsPage({ searchParams }: { searchPara
           <th className="p-2 text-right">التاريخ</th><th className="p-2 text-right">تفاصيل</th>
         </tr></thead>
         <tbody>
-          {items.map((c: any) => (
+          {items.map((c: Prisma.ComplaintGetPayload<{}>) => (
             <tr key={c.id} className="border-t">
               <td className="p-2">{c.referenceCode}</td>
               <td className="p-2">{c.subject}</td>

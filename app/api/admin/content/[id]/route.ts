@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import { contentItemSchema } from "@/lib/validation";
+import { z } from "zod";
 
 async function checkAdmin() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -23,12 +25,12 @@ export async function PUT(
 
   try {
     const { id } = await params;
-    const body = await request.json();
+    const body = await request.json() as Record<string, unknown>;
     
     const parsed = contentItemSchema.partial().safeParse(body);
     if (!parsed.success) {
       const fieldErrors: Record<string, string[]> = {};
-      parsed.error.issues.forEach((err) => {
+      parsed.error.issues.forEach((err: z.ZodIssue) => {
         const path = err.path.join(".");
         if (!fieldErrors[path]) fieldErrors[path] = [];
         fieldErrors[path].push(err.message);
@@ -40,16 +42,16 @@ export async function PUT(
     }
 
     const data = parsed.data;
-    const updateData: any = {
+    const updateData: Prisma.ContentItemUpdateManyMutationInput = {
       updatedBy: (session.user as any).id,
     };
 
-    if (data.type !== undefined) updateData.type = data.type.toUpperCase();
+    if (data.type !== undefined) updateData.type = data.type.toUpperCase() as never;
     if (data.title !== undefined) updateData.title = data.title;
     if (data.slug !== undefined) updateData.slug = data.slug;
     if (data.excerpt !== undefined) updateData.excerpt = data.excerpt || null;
     if (data.body !== undefined) updateData.body = data.body;
-    if (data.status !== undefined) updateData.status = (data.status || "draft").toUpperCase();
+    if (data.status !== undefined) updateData.status = (data.status || "draft").toUpperCase() as never;
     if (data.publishedAt !== undefined) updateData.publishedAt = data.publishedAt ? new Date(data.publishedAt) : null;
     if (data.eventStartAt !== undefined) updateData.eventStartAt = data.eventStartAt ? new Date(data.eventStartAt) : null;
     if (data.eventEndAt !== undefined) updateData.eventEndAt = data.eventEndAt ? new Date(data.eventEndAt) : null;

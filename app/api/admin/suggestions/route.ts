@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 
 async function checkAdmin() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -36,20 +37,20 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
-    const { id, status, reviewNote } = body;
+const body = await request.json() as Record<string, unknown>;
+const { id, status, reviewNote } = body as { id?: string; status?: string; reviewNote?: string };
 
     if (!id) {
       return NextResponse.json({ error: "المعرف مطلوب" }, { status: 400 });
     }
 
-    const updateData: any = {
+    const updateData: Prisma.SuggestionPrivateUpdateManyMutationInput = {
       reviewedAt: new Date(),
       reviewedBy: (session.user as any).id,
     };
 
     if (status) {
-      updateData.status = status.toUpperCase();
+      updateData.status = status.toUpperCase() as never;
     }
     if (reviewNote !== undefined) {
       updateData.reviewNote = reviewNote;

@@ -3,6 +3,9 @@ import { SiteHeader, SiteFooter } from "@/components/layout";
 import { prisma } from "@/lib/db";
 import { formatDateArabic, formatInCairo } from "@/lib/format-date";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Prisma } from "@prisma/client";
+
+type ContentItem = Prisma.ContentItemGetPayload<{}>;
 
 async function fetchItems(type: "NEWS" | "ACTIVITY" | "COMPETITION") {
   return prisma.contentItem.findMany({
@@ -46,7 +49,7 @@ export default async function HomePage() {
               <p className="text-muted-foreground">لا توجد أخبار منشورة حتى الآن</p>
             ) : (
               <div className="grid gap-4 md:grid-cols-3">
-                {news.map((item: any) => (
+                {news.map((item: ContentItem) => (
                   <Card key={item.id}>
                     <CardHeader>
                       <CardTitle className="text-lg">{item.title}</CardTitle>
@@ -73,7 +76,7 @@ export default async function HomePage() {
               <p className="text-muted-foreground">لا توجد أنشطة منشورة حتى الآن</p>
             ) : (
               <div className="grid gap-4 md:grid-cols-3">
-                {activities.map((item: any) => (
+                {activities.map((item: ContentItem) => (
                   <Card key={item.id}>
                     <CardHeader>
                       <CardTitle className="text-lg">{item.title}</CardTitle>
@@ -100,7 +103,7 @@ export default async function HomePage() {
               <p className="text-muted-foreground">لا توجد مسابقات منشورة حتى الآن</p>
             ) : (
               <div className="grid gap-4 md:grid-cols-3">
-                {competitions.map((item: any) => (
+                {competitions.map((item: ContentItem) => (
                   <Card key={item.id}>
                     <CardHeader>
                       <CardTitle className="text-lg">{item.title}</CardTitle>

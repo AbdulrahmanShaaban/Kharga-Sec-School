@@ -3,6 +3,9 @@ import { prisma } from "@/lib/db";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { Prisma } from "@prisma/client";
+
+type ContentItem = Prisma.ContentItemGetPayload<{}>;
 
 function statusOf(start?: Date | null, end?: Date | null) {
   const now = new Date();
@@ -12,7 +15,7 @@ function statusOf(start?: Date | null, end?: Date | null) {
 }
 
 export default async function CompetitionsPage() {
-  let items: any[] = [];
+  let items: ContentItem[] = [];
   try {
     items = await prisma.contentItem.findMany({
       where: { type: "COMPETITION", status: "PUBLISHED" },
@@ -31,7 +34,7 @@ export default async function CompetitionsPage() {
           <p className="text-muted-foreground">لا توجد مسابقات منشورة حتى الآن</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {items.map((item: any) => {
+            {items.map((item: ContentItem) => {
               const s = statusOf(item.eventStartAt, item.eventEndAt);
               return (
                 <Link key={item.id} href={`/competitions/${item.slug}`} className="block">

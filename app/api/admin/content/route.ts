@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 import { contentItemSchema } from "@/lib/validation";
+import { z } from "zod";
 
 async function checkAdmin() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -27,9 +29,9 @@ export async function GET(request: NextRequest) {
 
     const skip = (page - 1) * limit;
 
-    const where: any = {};
-    if (type) where.type = type.toUpperCase();
-    if (status) where.status = status.toUpperCase();
+    const where: Prisma.ContentItemWhereInput = {};
+    if (type) where.type = type.toUpperCase() as never;
+    if (status) where.status = status.toUpperCase() as never;
 
     const [items, total] = await Promise.all([
       prisma.contentItem.findMany({
@@ -63,11 +65,11 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
+    const body = await request.json() as Record<string, unknown>;
     const parsed = contentItemSchema.safeParse(body);
     if (!parsed.success) {
       const fieldErrors: Record<string, string[]> = {};
-      parsed.error.issues.forEach((err) => {
+      parsed.error.issues.forEach((err: z.ZodIssue) => {
         const path = err.path.join(".");
         if (!fieldErrors[path]) fieldErrors[path] = [];
         fieldErrors[path].push(err.message);

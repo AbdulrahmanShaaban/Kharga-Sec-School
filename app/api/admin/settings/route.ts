@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { siteSettingsSchema } from "@/lib/validation";
+import { z } from "zod";
 
 async function checkAdmin() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -38,12 +39,12 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
+    const body = await request.json() as Record<string, unknown>;
     const parsed = siteSettingsSchema.safeParse(body);
     if (!parsed.success) {
 const fieldErrors: Record<string, string[]> = {};
-      const issues = (parsed.error as any).issues || (parsed.error as any).errors || [];
-      issues.forEach((err: any) => {
+const issues = (parsed.error as { issues?: z.ZodIssue[]; errors?: z.ZodIssue[] }).issues || (parsed.error as { issues?: z.ZodIssue[]; errors?: z.ZodIssue[] }).errors || [];
+issues.forEach((err: z.ZodIssue) => {
         const path = err.path.join(".");
         if (!fieldErrors[path]) fieldErrors[path] = [];
         fieldErrors[path].push(err.message);

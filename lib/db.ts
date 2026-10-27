@@ -1,52 +1,64 @@
-// @ts-nocheck
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, type Prisma } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
-const globalForPrisma = global as unknown as { prisma: any };
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | null };
 
-function createClient(): any {
-  const connectionString = process.env.DATABASE_URL;
-  if (!connectionString) {
-    // Return a stub that returns empty results for build-time prerendering
-    // but throws at runtime if actually called without DATABASE_URL
-    const handler: ProxyHandler<any> = {
-      get: (_t: any, p: any) => {
-        const prop = String(p);
-        if (prop === "then" || prop === "catch" || prop === "toString" || prop === "valueOf") {
-          return undefined;
-        }
-        if (prop === "$connect" || prop === "$disconnect") {
-          return async () => { throw new Error("DATABASE_URL not configured"); };
-        }
-        // Return a function that returns appropriate empty values
-        const fn = (..._args: any[]) => {
-          const propUpper = prop.toUpperCase();
-          if (propUpper.includes("FIRST") || propUpper.includes("UNIQUE") || propUpper.includes("FINDUNIQUE") || propUpper.includes("UPSERT")) {
-            return Promise.resolve(null);
-          }
-          if (propUpper.includes("COUNT")) {
-            return Promise.resolve(0);
-          }
-          if (propUpper.includes("MANY") || propUpper.includes("FIND")) {
-            return Promise.resolve([]);
-          }
-          if (propUpper.includes("CREATE") || propUpper.includes("UPDATE") || propUpper.includes("DELETE")) {
-            throw new Error("DATABASE_URL not configured");
-          }
-          return Promise.resolve({});
-        };
-        // Make the function itself proxyable for model access (e.g., prisma.contentItem.findFirst)
-        return new Proxy(fn, handler);
-      },
-    };
-    return new Proxy((() => {}) as any, handler);
-  }
-  const adapter = new PrismaPg({ connectionString });
-  const client = new (PrismaClient as any)({ adapter });
-  return client;
+function createPrismaStub(): PrismaClient {
+  const noop = (): never => {
+    throw new Error("DATABASE_URL not configured");
+  };
+
+  const empty = <T>(value: T): Promise<T> => Promise.resolve(value);
+
+  const handler: ProxyHandler<PrismaClient> = {
+    get: (_target: PrismaClient, prop: string | symbol) => {
+      if (typeof prop === "symbol") return undefined;
+      const name = String(prop);
+
+      // PrismaClient methods
+      if (name === "$connect" || name === "$disconnect") return noop;
+      if (name === "$transaction") return noop;
+      if (name === "$queryRaw" || name === "$executeRaw") return noop;
+      if (name === "then" || name === "catch" || name === "toString" || name === "valueOf") return undefined;
+
+      // Return a model delegate proxy
+      return new Proxy(() => {}, {
+        get: (_t: any, p: string | symbol) => {
+          if (typeof p === "symbol") return undefined;
+          const m = String(p);
+          if (m === "then" || m === "catch" || m === "toString" || m === "valueOf") return undefined;
+
+          const method = (..._args: unknown[]): Promise<unknown> => {
+            const upper = m.toUpperCase();
+            if (upper.includes("FIRST") || upper.includes("UNIQUE") || upper.includes("UPSERT") || upper.includes("FINDUNIQUE")) {
+              return empty(null);
+            }
+            if (upper.includes("COUNT")) return empty(0);
+            if (upper.includes("MANY") || upper.includes("FIND")) return empty([]);
+            if (upper.includes("CREATE") || upper.includes("UPDATE") || upper.includes("DELETE") || upper.includes("DELETEMANY") || upper.includes("UPDATEMANY")) {
+              return Promise.resolve(noop());
+            }
+            return empty({});
+          };
+          return method;
+        },
+      });
+    },
+  };
+
+  return new Proxy(new PrismaClient(), handler);
 }
 
-export const prisma = globalForPrisma.prisma || createClient();
+function createClient(): PrismaClient {
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) {
+    return createPrismaStub();
+  }
+  const adapter = new PrismaPg({ connectionString });
+  return new PrismaClient({ adapter });
+}
+
+export const prisma = globalForPrisma.prisma ?? createClient();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 

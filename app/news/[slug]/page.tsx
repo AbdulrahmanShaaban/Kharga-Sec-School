@@ -3,6 +3,9 @@ import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import { format } from "date-fns";
+import { Prisma } from "@prisma/client";
+
+type ContentItemWithMedia = Prisma.ContentItemGetPayload<{ include: { media: true } }>;
 
 export default async function NewsDetailPage({ params }: { params: { slug: string } }) {
   const item = await prisma.contentItem.findFirst({
@@ -11,8 +14,8 @@ export default async function NewsDetailPage({ params }: { params: { slug: strin
   });
   if (!item) notFound();
 
-  const coverMedia = item.media.find((m: { isCover: boolean }) => m.isCover);
-  const gallery = item.media.filter((m: { isCover: boolean }) => !m.isCover);
+  const coverMedia = item.media.find((m: ContentItemWithMedia["media"][number]) => m.isCover);
+  const gallery = item.media.filter((m: ContentItemWithMedia["media"][number]) => !m.isCover);
 
   return (
     <div className="min-h-screen flex flex-col" dir="rtl">
@@ -31,7 +34,7 @@ export default async function NewsDetailPage({ params }: { params: { slug: strin
             <section className="mt-8">
               <h2 className="text-xl font-bold mb-3">معرض الصور</h2>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {gallery.map((m: any) => (
+                {gallery.map((m: ContentItemWithMedia["media"][number]) => (
                   <div key={m.id} className="relative h-40 w-full">
                     <Image src={m.secureUrl} alt={m.altText || ""} fill className="object-cover rounded" />
                   </div>
