@@ -1,0 +1,12 @@
+{
+  "buildCommand": "npx prisma migrate deploy && npx prisma generate && next build",
+  "installCommand": "npx prisma migrate deploy",
+  "framework": "nextjs",
+  "regions": ["syd1"],
+  "env": {
+    "BETTER_AUTH_SECRET": "kilo-portal-secret-2026-do-not-commit-production-key-32chars!",
+    "NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME": "da2ncjc3j",
+    "CLOUDINARY_API_KEY": "388961511973889",
+    "CLOUDINARY_API_SECRET": "Xn3vjuKsYhZn9gvHExI81fTTWUY"
+  }
+}

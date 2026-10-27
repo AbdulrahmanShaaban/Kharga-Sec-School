@@ -1,0 +1,44 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "skills": {
+    "paths": [
+      ".kilo/skills"
+    ]
+  },
+  "mcp": {
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "enabled": true
+    },
+    "playwright": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "@playwright/mcp@latest"
+      ],
+      "enabled": true
+    },
+    "chrome-devtools": {
+      "type": "local",
+      "command": [
+        "npx",
+        "-y",
+        "chrome-devtools-mcp@1.10.1"
+      ],
+      "enabled": false
+    }
+  },
+  "instructions": [
+    "AGENTS.md"
+  ],
+  "permission": {
+    "bash": "allow",
+    "edit": {
+      "src/**": "allow",
+      "*.lock": "deny",
+      "*": "ask"
+    }
+  }
+}
