@@ -11,12 +11,12 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { href: "/", label: "الصفحة الرئيسية" },
   { href: "/about", label: "نبذة عن المدرسة" },
-  { href: "/news", label: "ال الأخبار" },
+  { href: "/news", label: "الأخبار" },
   { href: "/activities", label: "الأنشطة" },
   { href: "/competitions", label: "المسابقات" },
   { href: "/contact", label: "التواصل" },
   { href: "/complaints", label: "الشكاوى" },
-  { href: "/suggestions", label: "المvitevats" },
+  { href: "/suggestions", label: "المقتراحات" },
 ];
 
 export function SiteHeader() {
@@ -31,8 +31,8 @@ export function SiteHeader() {
             <School className="h-6 w-6" />
           </div>
           <div className="flex flex-col">
-            <span className="text-lg font-bold text-primary">مدرسة External</span>
-            <span className="text-xs text-muted-foreground">ال الثانوية بنين</span>
+            <span className="text-lg font-bold text-primary">مدرسة الخرجة الثانوية بنين</span>
+            <span className="text-xs text-muted-foreground">مدرسة الخرجة الثانوية بنين</span>
           </div>
         </Link>
 
@@ -96,7 +96,7 @@ export function SiteFooter() {
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                 <School className="h-6 w-6" />
               </div>
-              <span className="font-bold text-primary">مدرسة External</span>
+              <span className="font-bold text-primary">مدرسة الخرجة الثانوية بنين</span>
             </div>
             <p className="text-sm text-muted-foreground">
               مدرسة الثانوية بنين
@@ -106,13 +106,13 @@ export function SiteFooter() {
             <h3 className="font-semibold mb-3">تفاصيل الاتصال</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li className="flex items-center gap-2">
-                <span>عنوان المدرسة (يُدخل من لوحة_given)</span>
+                <span>عنوان المدرسة (يُدخل من لوحة التحكم)</span>
               </li>
               <li className="flex items-center gap-2">
-                <span>رقم الهاتف (يُدخل من لوحة_given)</span>
+                <span>رقم الهاتف (يُدخل من لوحة التحكم)</span>
               </li>
               <li className="flex items-center gap-2">
-                <span>البريد الإلكتروني (يُدخل من لوحة_given)</span>
+                <span>البريد الإلكتروني (يُدخل من لوحة التحكم)</span>
               </li>
             </ul>
           </div>
@@ -120,16 +120,16 @@ export function SiteFooter() {
             <h3 className="font-semibold mb-3">روابط سريعة</h3>
             <ul className="space-y-2 text-sm">
               <li><Link href="/about" className="text-muted-foreground hover:text-accent">نبذة عن المدرسة</Link></li>
-              <li><Link href="/news" className="text-muted-foreground hover:text-accent">الvariant</Link></li>
+              <li><Link href="/news" className="text-muted-foreground hover:text-accent">الأخبار</Link></li>
               <li><Link href="/contact" className="text-muted-foreground hover:text-accent">التواصل</Link></li>
               <li><Link href="/privacy" className="text-muted-foreground hover:text-accent">خصوصية</Link></li>
             </ul>
           </div>
         </div>
         <div className="mt-8 pt-6 border-t text-center text-sm text-muted-foreground">
-          <p>© 2026 مدرسة External الثانوية بنين. جميع الحقوق محفوظة.</p>
+          <p>© 2026 مدرسة الخرجة الثانوية بنين. جميع الحقوق محفوظة.</p>
           <p className="mt-1">
-            <Link href="/privacy" className="hover:text-accent"> ipsos privacy</Link>
+            <Link href="/privacy" className="hover:text-accent">خصوصية</Link>
           </p>
         </div>
       </div>
