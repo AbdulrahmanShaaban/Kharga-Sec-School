@@ -114,12 +114,28 @@ export function AdminMobileNav({ user }: { user: PanelUser }) {
     setOpen(false);
   }, [pathname]);
 
+  // Lock background scroll while the drawer is open, and allow Escape to close.
+  React.useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
   return (
     <div className="lg:hidden">
       <button
         type="button"
         onClick={() => setOpen(true)}
         aria-label="فتح قائمة لوحة التحكم"
+        aria-expanded={open}
         className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-primary transition-colors hover:bg-muted"
       >
         <Menu className="h-5 w-5" aria-hidden />
