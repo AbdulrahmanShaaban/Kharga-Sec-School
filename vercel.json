@@ -2,5 +2,5 @@
   "buildCommand": "npx prisma migrate deploy && npx prisma generate && next build",
   "installCommand": "npx prisma migrate deploy",
   "framework": "nextjs",
-  "regions": ["syd1"]
+  "regions": ["fra1"]
 }
