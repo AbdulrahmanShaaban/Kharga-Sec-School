@@ -1,57 +1,87 @@
-import { SiteHeader, SiteFooter } from "@/components/layout";
-import { prisma } from "@/lib/db";
+import type { Metadata } from "next";
 import Link from "next/link";
-import Image from "next/image";
-import { format } from "date-fns";
-import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/db";
+import { getPageCopy } from "@/lib/page-copy";
+import { SiteHeader } from "@/components/site/header";
+import { SiteFooter } from "@/components/site/footer";
+import { ContentCard, EmptyState, PageHero } from "@/components/site/content";
 
-type ContentItemWithMedia = Prisma.ContentItemGetPayload<{ include: { media: true } }>;
+export const instant = false;
 
-export default async function NewsPage() {
-  let items: ContentItemWithMedia[] = [];
-  try {
-    items = await prisma.contentItem.findMany({
-      where: { type: "NEWS", status: "PUBLISHED" },
-      orderBy: [{ pinned: "desc" }, { publishedAt: "desc" }],
-      include: { media: true },
-    });
-  } catch {
-    items = [];
-  }
+export const metadata: Metadata = {
+  title: "الأخبار",
+  description: "آخر الأخبار والإعلانات الرسمية من مدرسة الخارجة الثانوية بنين.",
+};
+
+const PAGE_SIZE = 9;
+
+export default async function NewsPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+  const { page: pageParam } = await searchParams;
+  const page = Math.max(1, parseInt(pageParam || "1", 10) || 1);
+
+  const where = { type: "NEWS" as const, status: "PUBLISHED" as const };
+  const [items, total, copy] = await Promise.all([
+    prisma.contentItem.findMany({
+      where,
+      orderBy: [{ pinned: "desc" }, { publishedAt: "desc" }, { createdAt: "desc" }],
+      skip: (page - 1) * PAGE_SIZE,
+      take: PAGE_SIZE,
+      include: { media: { orderBy: [{ isCover: "desc" }, { sortOrder: "asc" }] } },
+    }),
+    prisma.contentItem.count({ where }),
+    getPageCopy("news"),
+  ]).catch(() => [[], 0, {} as Record<string, string>] as const);
+
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <div className="min-h-screen flex flex-col" dir="rtl">
+    <div className="flex min-h-screen flex-col">
       <SiteHeader />
-      <main className="flex-1 container mx-auto px-4 py-10">
-        <h1 className="text-3xl font-bold mb-6">ال الأخبار</h1>
+      <PageHero title={copy["hero.title"] || "أخبار المدرسة"} subtitle={copy["hero.subtitle"]} />
+
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-12 sm:px-6">
         {items.length === 0 ? (
-          <p className="text-muted-foreground">لا توجد أخبار منشورة حتى الآن</p>
+          <EmptyState
+            title={copy["empty.title"] || "لا توجد أخبار منشورة حتى الآن"}
+            hint={copy["empty.hint"]}
+          />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {items.map((item: ContentItemWithMedia) => {
-              const cover = item.media.find((m: ContentItemWithMedia["media"][number]) => m.isCover);
-              return (
-                <Link key={item.id} href={`/news/${item.slug}`} className="block">
-                  <article className="rounded-lg border bg-card overflow-hidden hover:shadow-lg transition">
-                    {cover && (
-                      <div className="relative h-48 w-full">
-                        <Image src={cover.secureUrl} alt={item.title} fill className="object-cover" />
-                      </div>
-                    )}
-                    <div className="p-4">
-                      <h2 className="font-bold text-lg mb-2">{item.title}</h2>
-                      {item.excerpt && <p className="text-sm text-muted-foreground mb-2 line-clamp-3">{item.excerpt}</p>}
-                      {item.publishedAt && (
-                        <p className="text-xs text-muted-foreground">{format(item.publishedAt, "yyyy-MM-dd")}</p>
-                      )}
-                    </div>
-                  </article>
-                </Link>
-              );
-            })}
-          </div>
+          <>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {items.map((item) => (
+                <ContentCard
+                  key={item.id}
+                  item={{
+                    href: `/news/${item.slug}`,
+                    title: item.title,
+                    excerpt: item.excerpt,
+                    coverUrl: item.media[0]?.secureUrl ?? null,
+                    publishedAt: item.publishedAt,
+                  }}
+                />
+              ))}
+            </div>
+
+            {pages > 1 && (
+              <nav aria-label="تصفح صفحات الأخبار" className="mt-10 flex items-center justify-center gap-2">
+                {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
+                  <Link
+                    key={p}
+                    href={p === 1 ? "/news" : `/news?page=${p}`}
+                    aria-current={p === page ? "page" : undefined}
+                    className={`tabular inline-flex h-10 min-w-10 items-center justify-center rounded-xl px-3 text-sm font-bold transition-colors ${
+                      p === page ? "bg-primary text-primary-foreground" : "border border-border bg-card text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {p}
+                  </Link>
+                ))}
+              </nav>
+            )}
+          </>
         )}
       </main>
+
       <SiteFooter />
     </div>
   );

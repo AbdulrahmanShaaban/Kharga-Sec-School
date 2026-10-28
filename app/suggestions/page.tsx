@@ -1,101 +1,78 @@
-"use client";
+import type { Metadata } from "next";
+import { Lightbulb, FileText } from "lucide-react";
+import { prisma } from "@/lib/db";
+import { getPageCopy } from "@/lib/page-copy";
+import { SiteHeader } from "@/components/site/header";
+import { SiteFooter } from "@/components/site/footer";
+import { PageHero, EmptyState } from "@/components/site/content";
+import { Reveal } from "@/components/site/motion";
+import { formatDateArabic } from "@/lib/format-date";
+import { SuggestionForm } from "./suggestion-form";
 
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { suggestionSchema, type SuggestionInput } from "@/lib/validation";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SiteHeader, SiteFooter } from "@/components/layout";
-import { useState, useRef } from "react";
+export const instant = false;
 
-declare global {
-  interface Window {
-    hcaptcha?: { getResponse: () => string; reset: () => void };
-  }
-}
+export const metadata: Metadata = {
+  title: "تقديم مقترح",
+  description: "نموذج تقديم المقترحات وعرض المقترحات المعتمدة للنشر — مدرسة الخارجة الثانوية بنين.",
+};
 
-export default function SuggestionsPage() {
-  const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const honeypotRef = useRef<HTMLInputElement>(null);
-
-  const form = useForm<SuggestionInput>({
-    resolver: zodResolver(suggestionSchema),
-  });
-
-  const onSubmit = async (data: SuggestionInput) => {
-    if (honeypotRef.current?.value) return;
-    setSubmitting(true);
-    setError(null);
-    const token = window.hcaptcha?.getResponse() ?? "";
-    try {
-      const res = await fetch("/api/public/suggestions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, hcaptcha: token }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json?.error ?? "حدث خطأ");
-      setSuccess(true);
-    } catch (e: unknown) {
-      if (e instanceof Error) {
-        setError(e.message);
-      } else {
-        setError("حدث خطأ");
-      }
-    } finally {
-      setSubmitting(false);
-    }
-  };
+export default async function SuggestionsPage() {
+  // Only approved, published suggestions — text only (spec §6).
+  const [published, copy] = await Promise.all([
+    prisma.publishedSuggestion.findMany({ orderBy: { publishedAt: "desc" }, take: 30 }).catch(() => []),
+    getPageCopy("suggestions"),
+  ]);
 
   return (
-    <div className="min-h-screen flex flex-col" dir="rtl">
+    <div className="flex min-h-screen flex-col">
       <SiteHeader />
-      <script src="https://js.hcaptcha.com/1/api.js" async defer />
-      <main className="flex-1 container mx-auto px-4 py-10">
-        <Card className="max-w-2xl mx-auto">
-          <CardHeader>
-            <CardTitle>تقديم اقتراح</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {success ? (
-              <p className="text-green-600">تم إرسال الاقتراح. سيتم نشره بعد مراجعة الإدارة.</p>
-            ) : (
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <input type="text" name="website" ref={honeypotRef} className="hidden" tabIndex={-1} autoComplete="off" />
-                <div>
-                  <Label>نص الاقتراح *</Label>
-                  <Textarea {...form.register("suggestionText")} maxLength={2000} />
-                  {form.formState.errors.suggestionText && <p className="text-red-600 text-sm">{form.formState.errors.suggestionText.message}</p>}
-                </div>
-                <div>
-                  <Label>اسم مقدم الاقتراح (اختياري)</Label>
-                  <Input {...form.register("submitterName")} />
-                </div>
-                <div>
-                  <Label>البريد الإلكتروني (اختياري)</Label>
-                  <Input type="email" {...form.register("contactEmail")} />
-                </div>
-                <div>
-                  <Label>رقم الهاتف (اختياري)</Label>
-                  <Input {...form.register("contactPhone")} />
-                </div>
-                <div className="flex items-center gap-2">
-                  <input type="checkbox" required />
-                  <Label>أوافق على أن الاقتراح سينشر فقط بعد مراجعة الإدارة</Label>
-                </div>
-                <div className="h-captcha" data-sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || ""} />
-                {error && <p className="text-red-600 text-sm">{error}</p>}
-                <Button type="submit" disabled={submitting}>{submitting ? "جارٍ الإرسال..." : "إرسال"}</Button>
-              </form>
-            )}
-          </CardContent>
-        </Card>
+      <PageHero title={copy["hero.title"] || "المقترحات"} subtitle={copy["hero.subtitle"]} />
+
+      <main className="mx-auto w-full max-w-5xl flex-1 space-y-12 px-4 py-12 sm:px-6">
+        <div className="rounded-2xl border border-secondary/25 bg-secondary-soft p-5 text-sm leading-relaxed text-secondary">
+          <strong className="font-extrabold">تنبيه:</strong> {copy["intro"]}
+        </div>
+
+        <Reveal>
+          <section className="rounded-3xl border border-border bg-card p-6 shadow-sm sm:p-8">
+            <div className="mb-6 flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary-soft text-secondary">
+                <Lightbulb className="h-5 w-5" aria-hidden />
+              </span>
+              <h2 className="text-xl font-extrabold text-primary">تقديم مقترح</h2>
+            </div>
+            <SuggestionForm />
+          </section>
+        </Reveal>
+
+        <section>
+          <div className="mb-6 flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-soft text-primary">
+              <FileText className="h-5 w-5" aria-hidden />
+            </span>
+            <h2 className="text-xl font-extrabold text-primary">{copy["published.heading"]}</h2>
+          </div>
+
+          {published.length === 0 ? (
+            <EmptyState
+              title="لا توجد مقترحات منشورة حتى الآن"
+              hint="تُنشر هنا المقترحات التي توافق الإدارة على نشرها، بنصّها فقط."
+            />
+          ) : (
+            <ul className="space-y-4">
+              {published.map((s) => (
+                <li key={s.id} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+                  <p className="prose-arabic whitespace-pre-wrap text-[15px] text-foreground">{s.suggestionText}</p>
+                  <p className="tabular mt-4 border-t border-border pt-3 text-xs text-muted-foreground">
+                    نُشر في {formatDateArabic(s.publishedAt)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </main>
+
       <SiteFooter />
     </div>
   );

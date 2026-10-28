@@ -1,45 +1,58 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { v2 as cloudinary } from "cloudinary";
+import { requireAdmin } from "@/lib/session";
+import { writeAuditLog } from "@/lib/audit";
+import { deleteCloudinaryAsset, isCloudinaryConfigured } from "@/lib/cloudinary";
 
-async function checkAdmin() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || (session.user as any).role !== "ADMIN") {
-    return null;
-  }
-  return session;
-}
+type Params = { params: Promise<{ publicId: string }> };
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ publicId: string }> }
-) {
-  const session = await checkAdmin();
-  if (!session) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+/**
+ * Delete a media asset — admin only.
+ *
+ * Safety rules (spec §7):
+ * - The asset must not be referenced by any content item.
+ * - The Cloudinary original is deleted through the server; the browser can
+ *   never issue deletions itself.
+ */
+export async function DELETE(_request: NextRequest, { params }: Params) {
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "غير مصرح" }, { status: 403 });
+
+  const { publicId } = await params;
+  if (!publicId || (!publicId.startsWith("school/content/") && !publicId.startsWith("school/site/"))) {
+    return NextResponse.json({ error: "مسار الصورة غير مسموح به" }, { status: 400 });
   }
 
   try {
-    const { publicId } = await params;
-    const decodedPublicId = decodeURIComponent(publicId);
+    const asset = await prisma.contentMedia.findUnique({ where: { publicId } });
+    if (!asset) return NextResponse.json({ error: "الصورة غير موجودة" }, { status: 404 });
 
-    const mediaInUse = await prisma.contentMedia.findFirst({
-      where: { publicId: decodedPublicId },
-    });
-
-    if (mediaInUse) {
-      return NextResponse.json(
-        { error: "لا يمكن حذف الوسائط لأنها قيد الاستخدام" },
-        { status: 400 }
-      );
+    if (asset.contentItemId) {
+      const item = await prisma.contentItem.findUnique({ where: { id: asset.contentItemId } });
+      if (item) {
+        return NextResponse.json(
+          { error: "الصورة مستخدمة في محتوى منشور. افصلها أولًا ثم أعد المحاولة." },
+          { status: 409 }
+        );
+      }
     }
 
-    await cloudinary.uploader.destroy(decodedPublicId);
+    if (isCloudinaryConfigured()) {
+      await deleteCloudinaryAsset(publicId, "image");
+    }
+
+    await prisma.contentMedia.delete({ where: { publicId } });
+
+    await writeAuditLog({
+      actorId: admin.id,
+      action: "media.delete",
+      entityType: "media",
+      entityId: asset.id,
+    });
 
     return NextResponse.json({ success: true });
   } catch {
+    console.error("[admin/media] delete failed");
     return NextResponse.json({ error: "حدث خطأ" }, { status: 500 });
   }
 }

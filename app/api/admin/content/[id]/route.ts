@@ -1,99 +1,123 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Prisma } from "@prisma/client";
+import { requireAdmin } from "@/lib/session";
+import { writeAuditLog } from "@/lib/audit";
 import { contentItemSchema } from "@/lib/validation";
-import { z } from "zod";
+import { fieldErrorsFromZod } from "@/lib/form-guard";
+import { Prisma } from "@prisma/client";
 
-async function checkAdmin() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || (session.user as any).role !== "ADMIN") {
-    return null;
-  }
-  return session;
+const CONTENT_TYPE_MAP = { news: "NEWS", activity: "ACTIVITY", competition: "COMPETITION" } as const;
+const CONTENT_STATUS_MAP = { draft: "DRAFT", published: "PUBLISHED", archived: "ARCHIVED", scheduled: "SCHEDULED" } as const;
+
+type Params = { params: Promise<{ id: string }> };
+
+export async function GET(_request: NextRequest, { params }: Params) {
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "غير مصرح" }, { status: 403 });
+
+  const { id } = await params;
+  const item = await prisma.contentItem.findUnique({
+    where: { id },
+    include: { media: { orderBy: { sortOrder: "asc" } } },
+  });
+  if (!item) return NextResponse.json({ error: "المحتوى غير موجود" }, { status: 404 });
+  return NextResponse.json(item);
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const session = await checkAdmin();
-  if (!session) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+export async function PUT(request: NextRequest, { params }: Params) {
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "غير مصرح" }, { status: 403 });
+
+  const { id } = await params;
 
   try {
-    const { id } = await params;
-    const body = await request.json() as Record<string, unknown>;
-    
-    const parsed = contentItemSchema.partial().safeParse(body);
+    const existing = await prisma.contentItem.findUnique({ where: { id } });
+    if (!existing) return NextResponse.json({ error: "المحتوى غير موجود" }, { status: 404 });
+
+    const body = (await request.json()) as Record<string, unknown>;
+    const parsed = contentItemSchema.safeParse(body);
     if (!parsed.success) {
-      const fieldErrors: Record<string, string[]> = {};
-      parsed.error.issues.forEach((err: z.ZodIssue) => {
-        const path = err.path.join(".");
-        if (!fieldErrors[path]) fieldErrors[path] = [];
-        fieldErrors[path].push(err.message);
-      });
       return NextResponse.json(
-        { error: "بيانات غير صالحة", fieldErrors },
+        { error: "بيانات غير صحيحة", fieldErrors: fieldErrorsFromZod(parsed.error.issues) },
         { status: 400 }
       );
     }
 
     const data = parsed.data;
-    const updateData: Prisma.ContentItemUpdateManyMutationInput = {
-      updatedBy: (session.user as any).id,
-    };
-
-    if (data.type !== undefined) updateData.type = data.type.toUpperCase() as never;
-    if (data.title !== undefined) updateData.title = data.title;
-    if (data.slug !== undefined) updateData.slug = data.slug;
-    if (data.excerpt !== undefined) updateData.excerpt = data.excerpt || null;
-    if (data.body !== undefined) updateData.body = data.body;
-    if (data.status !== undefined) updateData.status = (data.status || "draft").toUpperCase() as never;
-    if (data.publishedAt !== undefined) updateData.publishedAt = data.publishedAt ? new Date(data.publishedAt) : null;
-    if (data.eventStartAt !== undefined) updateData.eventStartAt = data.eventStartAt ? new Date(data.eventStartAt) : null;
-    if (data.eventEndAt !== undefined) updateData.eventEndAt = data.eventEndAt ? new Date(data.eventEndAt) : null;
-    if (data.location !== undefined) updateData.location = data.location || null;
-    if (data.conditions !== undefined) updateData.conditions = data.conditions || null;
-    if (data.results !== undefined) updateData.results = data.results || null;
-    if (data.pinned !== undefined) updateData.pinned = data.pinned;
-    if (data.sortOrder !== undefined) updateData.sortOrder = data.sortOrder;
+    const publishedAt =
+      data.publishedAt ? new Date(data.publishedAt) : data.status === "published" && !existing.publishedAt ? new Date() : data.status === "published" ? existing.publishedAt : null;
 
     const updated = await prisma.contentItem.update({
       where: { id },
-      data: updateData,
+      data: {
+        type: CONTENT_TYPE_MAP[data.type],
+        title: data.title,
+        slug: data.slug,
+        excerpt: data.excerpt || null,
+        body: data.body,
+        status: CONTENT_STATUS_MAP[data.status],
+        publishedAt,
+        eventStartAt: data.eventStartAt ? new Date(data.eventStartAt) : null,
+        eventEndAt: data.eventEndAt ? new Date(data.eventEndAt) : null,
+        location: data.location || null,
+        conditions: data.conditions || null,
+        results: data.results || null,
+        pinned: data.pinned,
+        sortOrder: data.sortOrder,
+        updatedBy: admin.id,
+      },
       include: { media: true },
     });
 
+    await writeAuditLog({
+      actorId: admin.id,
+      action: "content.update",
+      entityType: "content",
+      entityId: id,
+      metadata: { status: data.status, type: data.type },
+    });
+
     return NextResponse.json(updated);
-  } catch {
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      return NextResponse.json(
+        { error: "يوجد محتوى آخر بنفس الرابط المختصر (slug)", fieldErrors: { slug: ["الرابط المختصر مستخدم بالفعل"] } },
+        { status: 409 }
+      );
+    }
+    console.error("[admin/content] update failed");
     return NextResponse.json({ error: "حدث خطأ" }, { status: 500 });
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const session = await checkAdmin();
-  if (!session) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+/**
+ * Soft delete: published content is archived instead of destroyed (spec §7).
+ */
+export async function DELETE(_request: NextRequest, { params }: Params) {
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "غير مصرح" }, { status: 403 });
+
+  const { id } = await params;
 
   try {
-    const { id } = await params;
-    const archived = await prisma.contentItem.update({
+    const existing = await prisma.contentItem.findUnique({ where: { id } });
+    if (!existing) return NextResponse.json({ error: "المحتوى غير موجود" }, { status: 404 });
+
+    const updated = await prisma.contentItem.update({
       where: { id },
-      data: {
-        status: "ARCHIVED",
-        updatedBy: (session.user as any).id,
-      },
+      data: { status: "ARCHIVED", updatedBy: admin.id },
     });
 
-    return NextResponse.json(archived);
+    await writeAuditLog({
+      actorId: admin.id,
+      action: "content.archive",
+      entityType: "content",
+      entityId: id,
+    });
+
+    return NextResponse.json(updated);
   } catch {
+    console.error("[admin/content] archive failed");
     return NextResponse.json({ error: "حدث خطأ" }, { status: 500 });
   }
 }

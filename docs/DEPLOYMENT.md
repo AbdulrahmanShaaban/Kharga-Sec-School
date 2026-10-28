@@ -4,87 +4,65 @@
 
 - Vercel account with a Git repository
 - Neon PostgreSQL database
-- Cloudinary account
-- hCaptcha account (for spam protection)
+- Cloudinary account (for the media library)
 
 ## Step 1: Connect Git to Vercel
 
 1. Push your code to a Git repository (GitHub, GitLab, etc.)
 2. Go to [vercel.com](https://vercel.com) and import the repository
-3. Vercel will auto-detect Next.js
+3. Vercel auto-detects Next.js; `vercel.json` sets the build commands
+   (`prisma migrate deploy && prisma generate && next build`)
 
 ## Step 2: Configure Environment Variables
 
-In the Vercel dashboard, set these environment variables for each environment:
+Set these in the Vercel dashboard (Project → Settings → Environment Variables)
+for each environment. **Never** put secrets in `vercel.json`.
 
-### Development
 ```
-DATABASE_URL=postgresql://...
-BETTER_AUTH_SECRET=...
-BETTER_AUTH_URL=http://localhost:3000
-NEXT_PUBLIC_HCAPTCHA_SITE_KEY=...
-HCAPTCHA_SECRET=...
+DATABASE_URL=postgresql://...            # Neon connection string
+BETTER_AUTH_SECRET=...                   # random, ≥ 32 chars
+BETTER_AUTH_URL=https://yourschool.com   # production URL (http://localhost:3000 in dev)
+NEXT_PUBLIC_SITE_URL=https://yourschool.com
 CLOUDINARY_CLOUD_NAME=...
 CLOUDINARY_API_KEY=...
 CLOUDINARY_API_SECRET=...
 ```
 
-### Preview
+Development-only extras (do NOT set in production):
+
 ```
-DATABASE_URL=postgresql://...
-BETTER_AUTH_SECRET=...
-BETTER_AUTH_URL=https://your-preview.vercel.app
-NEXT_PUBLIC_HCAPTCHA_SITE_KEY=...
-HCAPTCHA_SECRET=...
-CLOUDINARY_CLOUD_NAME=...
-CLOUDINARY_API_KEY=...
-CLOUDINARY_API_SECRET=...
+DEV_ADMIN_EMAIL=devadmin@localhost.test
+DEV_ADMIN_PASSWORD=dev-admin-password-123
 ```
 
-### Production
-```
-DATABASE_URL=postgresql://...
-BETTER_AUTH_SECRET=...
-BETTER_AUTH_URL=https://yourschool.com
-NEXT_PUBLIC_HCAPTCHA_SITE_KEY=...
-HCAPTCHA_SECRET=...
-CLOUDINARY_CLOUD_NAME=...
-CLOUDINARY_API_KEY=...
-CLOUDINARY_API_SECRET=...
-PUBLIC_SITE_URL=https://yourschool.com
-```
+## Step 3: Verify the deployment
 
-## Step 3: Run Database Migrations
-
-```bash
-npx prisma migrate deploy
-npx prisma generate
-```
-
-## Step 4: Deploy
-
-1. Click "Deploy" in Vercel
-2. Wait for the build to complete
-3. Verify the deployment by visiting the URL
-
-## Step 5: Verify
-
-- [ ] All public pages load correctly
-- [ ] Admin login works
-- [ ] Content management works
-- [ ] Complaint/suggestion forms work
-- [ ] Cloudinary uploads work
+- [ ] All public pages load (`/`, `/news`, `/activities`, `/competitions`, `/about`, `/contact`)
+- [ ] `/complaints` submits and returns a reference code
+- [ ] `/suggestions` submits; approving from the admin publishes text only
+- [ ] Admin login works at `/admin/login`
+- [ ] Content create/edit/archive works
+- [ ] Media upload (sign → Cloudinary → register) and delete work
+- [ ] Settings save and appear on the public site
+- [ ] Anonymous requests to `/api/admin/*` return 403
+- [ ] `/sitemap.xml` uses the real domain (not localhost)
+- [ ] `robots.txt` disallows `/admin`
 
 ## Rollback
 
-To rollback to a previous deployment:
-1. Go to Vercel dashboard
-2. Click "Deployments"
-3. Click the three dots on the previous deployment
-4. Click "Promote to Production"
+1. Vercel dashboard → Deployments
+2. Three dots on the previous healthy deployment → "Promote to Production"
 
 ## Environment-Specific Notes
 
-- **Development**: Use local SQLite or Neon dev database
-- **Preview**: Use a separate Neon branch for testing
-- **Production**: Use the production Neon database and Cloudinary account
+- **Development**: local `.env` + Neon dev database; `npm run db:seed` and
+  `npm run dev:admin` refuse to run in production
+- **Preview**: use a separate Neon branch; point its `DATABASE_URL` at the branch
+- **Production**: production Neon database + the school-approved Cloudinary;
+  bootstrap the admin once via `npm run bootstrap:admin` (docs/ADMIN-SETUP.md)
+
+## Vercel Hobby limits
+
+- Function bodies are capped at 4.5 MB — that is why images upload **directly**
+  to Cloudinary with server-signed parameters instead of through the API routes
+- Serverless duration limits: all queries are indexed (see `prisma/schema.prisma`)

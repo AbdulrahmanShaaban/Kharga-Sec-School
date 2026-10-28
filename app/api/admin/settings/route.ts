@@ -1,81 +1,67 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { requireAdmin } from "@/lib/session";
+import { writeAuditLog } from "@/lib/audit";
 import { siteSettingsSchema } from "@/lib/validation";
-import { z } from "zod";
+import { fieldErrorsFromZod } from "@/lib/form-guard";
 
-async function checkAdmin() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || (session.user as any).role !== "ADMIN") {
-    return null;
-  }
-  return session;
-}
-
+/**
+ * Site settings: readable only by the admin. The public site reads settings
+ * directly on the server (server components), never through this endpoint.
+ */
 export async function GET() {
-  const session = await checkAdmin();
-  if (!session) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "غير مصرح" }, { status: 403 });
 
   try {
     let settings = await prisma.siteSettings.findFirst();
     if (!settings) {
-      settings = await prisma.siteSettings.create({
-        data: {},
-      });
+      settings = await prisma.siteSettings.create({ data: {} });
     }
     return NextResponse.json(settings);
   } catch {
+    console.error("[admin/settings] read failed");
     return NextResponse.json({ error: "حدث خطأ" }, { status: 500 });
   }
 }
 
 export async function PUT(request: NextRequest) {
-  const session = await checkAdmin();
-  if (!session) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "غير مصرح" }, { status: 403 });
 
   try {
-    const body = await request.json() as Record<string, unknown>;
+    const body = (await request.json()) as Record<string, unknown>;
     const parsed = siteSettingsSchema.safeParse(body);
     if (!parsed.success) {
-const fieldErrors: Record<string, string[]> = {};
-const issues = (parsed.error as { issues?: z.ZodIssue[]; errors?: z.ZodIssue[] }).issues || (parsed.error as { issues?: z.ZodIssue[]; errors?: z.ZodIssue[] }).errors || [];
-issues.forEach((err: z.ZodIssue) => {
-        const path = err.path.join(".");
-        if (!fieldErrors[path]) fieldErrors[path] = [];
-        fieldErrors[path].push(err.message);
-      });
-return NextResponse.json(
-        { error: "بيانات غير صحيحة", fieldErrors },
+      return NextResponse.json(
+        { error: "بيانات غير صحيحة", fieldErrors: fieldErrorsFromZod(parsed.error.issues) },
         { status: 400 }
       );
     }
 
     const data = parsed.data;
-    let settings = await prisma.siteSettings.findFirst();
-    if (!settings) {
-      settings = await prisma.siteSettings.create({
-        data: {
-          ...data,
-          updatedBy: (session.user as any).id,
-        },
-      });
-    } else {
-      settings = await prisma.siteSettings.update({
-        where: { id: settings.id },
-        data: {
-          ...data,
-          updatedBy: (session.user as any).id,
-        },
-      });
-    }
+    const existing = await prisma.siteSettings.findFirst();
+
+    const settings = existing
+      ? await prisma.siteSettings.update({
+          where: { id: existing.id },
+          data: { ...data, updatedBy: admin.id },
+        })
+      : await prisma.siteSettings.create({
+          data: { ...data, updatedBy: admin.id },
+        });
+
+    await writeAuditLog({
+      actorId: admin.id,
+      action: "settings.update",
+      entityType: "settings",
+      entityId: settings.id,
+      metadata: { fields: Object.keys(data).length },
+    });
 
     return NextResponse.json(settings);
   } catch {
+    console.error("[admin/settings] update failed");
     return NextResponse.json({ error: "حدث خطأ" }, { status: 500 });
   }
 }

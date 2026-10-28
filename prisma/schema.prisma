@@ -109,6 +109,9 @@ model ContentItem {
   createdBy      String?
   updatedBy      String?
   media          ContentMedia[]
+
+  @@index([type, status, publishedAt])
+  @@index([status, updatedAt])
 }
 
 enum ContentType {
@@ -124,19 +127,26 @@ enum ContentStatus {
   SCHEDULED
 }
 
+/// Media library asset (public school-approved images only).
+/// `contentItemId` is optional: an asset may live in the library before it is
+/// attached to a news/activity/competition item.
 model ContentMedia {
   id            String       @id @default(cuid())
-  contentItemId String
-  publicId      String
+  contentItemId String?
+  publicId      String       @unique
   secureUrl     String
+  format        String?
+  bytes         Int?
   altText       String?
   width         Int?
   height        Int?
-  mediaType     MediaType
-  isCover       Boolean       @default(false)
-  sortOrder     Int           @default(0)
-  createdAt     DateTime      @default(now())
-  contentItem   ContentItem   @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  mediaType     MediaType    @default(IMAGE)
+  isCover       Boolean      @default(false)
+  sortOrder     Int          @default(0)
+  createdAt     DateTime     @default(now())
+  contentItem   ContentItem? @relation(fields: [contentItemId], references: [id], onDelete: SetNull)
+
+  @@index([contentItemId])
 }
 
 enum MediaType {
@@ -162,6 +172,8 @@ model Complaint {
   reviewedAt     DateTime?
   reviewedBy     String?
   resolvedAt     DateTime?
+
+  @@index([status, submittedAt])
 }
 
 enum ComplaintStatus {
@@ -185,6 +197,8 @@ model SuggestionPrivate {
   reviewedAt       DateTime?
   reviewedBy       String?
   published        PublishedSuggestion?
+
+  @@index([status, submittedAt])
 }
 
 enum SuggestionStatus {
@@ -192,6 +206,20 @@ enum SuggestionStatus {
   APPROVED
   REJECTED
   HIDDEN
+}
+
+/// Full-CMS page copy: every editable text on the public site is stored here
+/// as a (page, key) pair, so school staff can change wording without code.
+model PageCopy {
+  id        String   @id @default(cuid())
+  page      String
+  key       String
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@unique([page, key])
+  @@index([page])
 }
 
 model PublishedSuggestion {

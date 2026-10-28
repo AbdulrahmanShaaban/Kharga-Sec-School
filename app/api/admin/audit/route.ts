@@ -1,30 +1,23 @@
-import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { requireAdmin } from "@/lib/session";
 
-async function checkAdmin() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session || (session.user as any).role !== "ADMIN") {
-    return null;
-  }
-  return session;
-}
-
+/**
+ * Admin audit trail (read-only). Entries never contain complaint/suggestion
+ * text or personal data — only actor, action, entity ids, and safe metadata.
+ */
 export async function GET() {
-  const session = await checkAdmin();
-  if (!session) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const admin = await requireAdmin();
+  if (!admin) return NextResponse.json({ error: "غير مصرح" }, { status: 403 });
 
   try {
-    const logs = await prisma.adminAuditLog.findMany({
+    const items = await prisma.adminAuditLog.findMany({
       orderBy: { createdAt: "desc" },
       take: 100,
     });
-
-    return NextResponse.json(logs);
+    return NextResponse.json({ items });
   } catch {
+    console.error("[admin/audit] list failed");
     return NextResponse.json({ error: "حدث خطأ" }, { status: 500 });
   }
 }

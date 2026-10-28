@@ -44,3 +44,5 @@ next-env.d.ts
 # sqlite
 dev.db
 *.db
+# Browser automation artifacts
+.playwright-mcp/

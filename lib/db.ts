@@ -1,4 +1,4 @@
-import { PrismaClient, type Prisma } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | null };
@@ -23,7 +23,7 @@ function createPrismaStub(): PrismaClient {
 
       // Return a model delegate proxy
       return new Proxy(() => {}, {
-        get: (_t: any, p: string | symbol) => {
+        get: (_t: unknown, p: string | symbol) => {
           if (typeof p === "symbol") return undefined;
           const m = String(p);
           if (m === "then" || m === "catch" || m === "toString" || m === "valueOf") return undefined;

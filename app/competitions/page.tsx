@@ -1,59 +1,61 @@
-import { SiteHeader, SiteFooter } from "@/components/layout";
+import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
-import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
-import { Prisma } from "@prisma/client";
+import { getPageCopy } from "@/lib/page-copy";
+import { SiteHeader } from "@/components/site/header";
+import { SiteFooter } from "@/components/site/footer";
+import { ContentCard, EmptyState, PageHero, competitionStatus } from "@/components/site/content";
+import { formatInCairo } from "@/lib/format-date";
 
-type ContentItem = Prisma.ContentItemGetPayload<{}>;
+export const instant = false;
 
-function statusOf(start?: Date | null, end?: Date | null) {
-  const now = new Date();
-  if (start && now < start) return "upcoming";
-  if (end && now > end) return "closed";
-  return "open";
-}
+export const metadata: Metadata = {
+  title: "المسابقات",
+  description: "المسابقات التربوية والتعليمية وشروط المشاركة ونتائجها — مدرسة الخارجة الثانوية بنين.",
+};
 
 export default async function CompetitionsPage() {
-  let items: ContentItem[] = [];
-  try {
-    items = await prisma.contentItem.findMany({
-      where: { type: "COMPETITION", status: "PUBLISHED" },
-      orderBy: [{ pinned: "desc" }, { publishedAt: "desc" }],
-    });
-  } catch {
-    items = [];
-  }
+  const [items, copy] = await Promise.all([
+    prisma.contentItem
+      .findMany({
+        where: { type: "COMPETITION", status: "PUBLISHED" },
+        orderBy: [{ pinned: "desc" }, { eventStartAt: "desc" }, { createdAt: "desc" }],
+        include: { media: { orderBy: [{ isCover: "desc" }, { sortOrder: "asc" }] } },
+      })
+      .catch(() => []),
+    getPageCopy("competitions"),
+  ]);
 
   return (
-    <div className="min-h-screen flex flex-col" dir="rtl">
+    <div className="flex min-h-screen flex-col">
       <SiteHeader />
-      <main className="flex-1 container mx-auto px-4 py-10">
-        <h1 className="text-3xl font-bold mb-6">المسابقات</h1>
+      <PageHero title={copy["hero.title"] || "مسابقات المدرسة"} subtitle={copy["hero.subtitle"]} />
+
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-12 sm:px-6">
         {items.length === 0 ? (
-          <p className="text-muted-foreground">لا توجد مسابقات منشورة حتى الآن</p>
+          <EmptyState
+            title={copy["empty.title"] || "لا توجد مسابقات منشورة حتى الآن"}
+            hint={copy["empty.hint"]}
+          />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {items.map((item: ContentItem) => {
-              const s = statusOf(item.eventStartAt, item.eventEndAt);
-              return (
-                <Link key={item.id} href={`/competitions/${item.slug}`} className="block">
-                  <article className="rounded-lg border bg-card p-4 hover:shadow-lg transition">
-                    <div className="flex items-center justify-between mb-2">
-                      <h2 className="font-bold text-lg">{item.title}</h2>
-                      <Badge variant={s === "open" ? "default" : s === "upcoming" ? "secondary" : "outline"}>
-                        {s === "open" ? "فتح" : s === "upcoming" ? "قريباً" : "غلق"}
-                      </Badge>
-                    </div>
-                    {item.excerpt && <p className="text-sm text-muted-foreground mb-2 line-clamp-3">{item.excerpt}</p>}
-                    {item.conditions && <p className="text-sm line-clamp-2">{item.conditions}</p>}
-                  </article>
-                </Link>
-              );
-            })}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {items.map((item) => (
+              <ContentCard
+                key={item.id}
+                item={{
+                  href: `/competitions/${item.slug}`,
+                  title: item.title,
+                  excerpt: item.excerpt,
+                  coverUrl: item.media[0]?.secureUrl ?? null,
+                  eventStartAt: item.eventStartAt,
+                  location: item.location,
+                  status: competitionStatus(item.eventStartAt, item.eventEndAt),
+                }}
+              />
+            ))}
           </div>
         )}
       </main>
+
       <SiteFooter />
     </div>
   );

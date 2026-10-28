@@ -1,44 +1,60 @@
 # Admin Setup
 
-This document describes how to set up the first administrator account.
+How to create and manage the first administrator account.
 
 ## Prerequisites
 
-1. The school must have approved the use of the email `alkhargasecondaryschoolforboys@gmail.com`
+1. The school must have approved the admin email address
+   (`alkhargasecondaryschoolforboys@gmail.com` unless changed)
 2. The database must be provisioned and `DATABASE_URL` configured
-3. Cloudinary and hCaptcha accounts must be set up
+3. `BETTER_AUTH_SECRET` must be set (random string, ≥ 32 characters)
 
-## Bootstrap Admin
+## Bootstrap (trusted procedure)
 
-Run this command in a trusted environment (e.g., a secure server or local machine):
+Run in a trusted environment (local machine or secure server), **never** from a
+public surface:
 
 ```bash
-npx tsx scripts/bootstrap-admin.ts
+ADMIN_BOOTSTRAP_EMAIL=alkhargasecondaryschoolforboys@gmail.com npm run bootstrap:admin
 ```
 
 The script will:
-1. Verify the email matches `ADMIN_BOOTSTRAP_EMAIL` env variable
-2. Create the user if they don't exist
-3. Set their role to `ADMIN`
-4. Prompt for a password (securely, not logged)
 
-**Never** run this in production without proper security measures.
+1. Refuse to run if `ADMIN_BOOTSTRAP_EMAIL` is missing or differs from the
+   school-approved address
+2. Prompt for a password interactively (≥ 10 characters; never logged or stored)
+3. Create the user with role `ADMIN` and a Better Auth credential (scrypt hash)
+4. Re-running never overwrites an existing ADMIN account's password
 
-## Manual Setup via SQL
+Then sign in at `/admin/login`.
 
-If the bootstrap script is not available, you can create the admin directly:
+## Development admin
 
-```sql
-INSERT INTO "User" (id, name, email, "emailVerified", role, "createdAt", "updatedAt")
-VALUES (gen_random_uuid(), 'Admin', 'alkhargasecondaryschoolforboys@gmail.com', true, 'ADMIN', now(), now())
-ON CONFLICT (email) DO UPDATE SET role = 'ADMIN';
+For local work only:
+
+```bash
+npm run dev:admin
+# devadmin@localhost.test / dev-admin-password-123
 ```
 
-Then sign in via the login page with the password you set.
+This script refuses to run when `NODE_ENV=production` and uses a clearly fake
+address that can never collide with the school-approved admin.
+
+## Why there is no public sign-up
+
+Public registration is disabled in `lib/auth.ts`
+(`emailAndPassword.disableSignUp`). The only account-creation paths are the
+bootstrap script and the development script — both run outside the web app
+(spec §10).
 
 ## Security Notes
 
-- The admin email is not a secret, but it must match the approved email
-- Passwords are hashed using bcrypt via Better Auth
-- Sessions are stored as HttpOnly cookies
-- MFA should be enabled before production launch
+- Passwords are hashed by Better Auth's own hasher (scrypt) — the bootstrap
+  uses `better-auth/crypto.hashPassword` so hashes always match sign-in
+- Sessions are HttpOnly cookies (Secure + SameSite=Lax in production)
+- Every admin page and admin API re-reads the role from the database
+  (`lib/session.ts#requireAdmin`) — the session cookie is never trusted for role
+- Sign-in endpoints are rate-limited by Better Auth (10 requests/min per IP)
+- Every admin action is written to `AdminAuditLog` without personal data
+- Deleting an admin account: delete the `User` row (cascades to sessions and
+  accounts) from a trusted environment
