@@ -81,4 +81,3 @@ See [.env.example](.env.example) for all required variables. Never commit `.env`
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — deploying to Vercel
 - [docs/SECURITY.md](docs/SECURITY.md) — security posture
 - [docs/BACKUP-RESTORE.md](docs/BACKUP-RESTORE.md) — database backup/restore
-- 
